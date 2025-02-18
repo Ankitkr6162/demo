@@ -1,0 +1,205 @@
+sbBox10d: Used to store claim codes.
+nInvoiceId: Stores the invoice ID.
+nLegacyPrintKeyVal: Stores a flag indicating how claim codes should be printed.
+oVecClaimCodes: A list to store condition information codes.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Step 1: Initialize Variables
+nInvoiceId = oSuperBill.getInvoiceId(); → Gets the invoice ID.
+sbBox10d = new StringBuffer(""); → A string buffer to store claim codes.
+nLegacyPrintKeyVal = 0; → Default value to check whether to append new claim codes.
+oVecClaimCodes = new Vector(); → Stores claim codes retrieved from the database.
+Step 2: Fetch Existing reserved10d from hcfa Table
+Query:
+
+sql
+Copy
+Edit
+SELECT reserved10d FROM hcfa WHERE id = ?;
+Flow:
+
+Retrieves the existing claim code stored in the hcfa table for a given nHCFAPrintId.
+If data exists, it is stored in sbBox10d.
+Code Snippet:
+
+java
+Copy
+Edit
+oPrStmt = oRoot.con.prepareStatement("SELECT reserved10d FROM hcfa WHERE id = ?");
+nParam = 0;
+oPrStmt.setInt(++nParam, nHCFAPrintId);
+oRs = oPrStmt.executeQuery();
+if(oRs.next()) {
+    sbBox10d.append(Root.TrimString(oRs.getString("reserved10d")));
+}
+Step 3: Check Legacy Print Setting
+Query:
+
+sql
+Copy
+Edit
+SELECT keyvalue FROM hcfa0212_legacyprint WHERE keyname = 'hcfabox10d' AND deleteflag = 0;
+Flow:
+
+Fetches keyvalue from hcfa0212_legacyprint to determine if new claim codes should be appended or replace existing ones.
+If keyvalue == 2, old values are cleared.
+If keyvalue == 0 or 2, new claim codes should be printed.
+Code Snippet:
+
+java
+Copy
+Edit
+oPrStmt = oRoot.con.prepareStatement("SELECT keyvalue FROM hcfa0212_legacyprint WHERE keyname = 'hcfabox10d' AND deleteflag = 0");
+oRs = oPrStmt.executeQuery();
+if(oRs.next()) {
+    nLegacyPrintKeyVal = oRs.getInt("keyvalue");
+}
+Decision Based on nLegacyPrintKeyVal:
+
+If nLegacyPrintKeyVal == 2: sbBox10d = new StringBuffer(""); // Clear old claim codes
+If nLegacyPrintKeyVal == 0 or 2: Fetch new claim codes.
+Step 4: Fetch Claim Codes from edi_inv_claimData
+Query:
+
+sql
+Copy
+Edit
+SELECT conditioninformationcode FROM edi_inv_claimData WHERE InvId = ?;
+Flow:
+
+Retrieves the primary claim condition code for the given invoice ID (nInvoiceId).
+If a non-empty value exists, it is added to oVecClaimCodes.
+Code Snippet:
+
+java
+Copy
+Edit
+oPrStmt = oRoot.con.prepareStatement("SELECT conditioninformationcode FROM edi_inv_claimData WHERE InvId = ?");
+nParam = 0;
+oPrStmt.setInt(++nParam, nInvoiceId);
+oRs = oPrStmt.executeQuery();
+if(oRs.next()) {
+    str = Root.TrimString(oRs.getString("conditioninformationcode"));
+    if(str.length() > 0) {
+        oVecClaimCodes.add(str);
+    }
+}
+Step 5: Fetch Additional Condition Codes from edi_inv_conditioncodes
+Query:
+
+sql
+Copy
+Edit
+SELECT conditioninformationcode FROM edi_inv_conditioncodes WHERE claimid = ? AND deleteflag = 0;
+Flow:
+
+Fetches extra claim condition codes linked to the invoice.
+If valid codes exist, they are added to oVecClaimCodes.
+Code Snippet:
+
+java
+Copy
+Edit
+oPrStmt = oRoot.con.prepareStatement("SELECT conditioninformationcode FROM edi_inv_conditioncodes WHERE claimid = ? AND deleteflag = 0");
+nParam = 0;
+oPrStmt.setInt(++nParam, nInvoiceId);
+oRs = oPrStmt.executeQuery();
+while(oRs.next()) {
+    str = Root.TrimString(oRs.getString("conditioninformationcode"));
+    if(str.length() > 0) {
+        oVecClaimCodes.add(str);
+    }
+}
+Step 6: Build Claim Code String
+If there are valid claim codes, they are appended up to 4 times to sbBox10d.
+If sbBox10d already contains a value, it appends a separator (NFS.FormatNSFString("", 3)).
+Code Snippet:
+
+java
+Copy
+Edit
+if(oVecClaimCodes != null && oVecClaimCodes.size() > 0) {					
+    for(int i = 0; i < oVecClaimCodes.size(); i++) {
+        if(i >= 4) {
+            break;
+        }
+        if(sbBox10d.length() > 0) {
+            sbBox10d.append(NFS.FormatNSFString("", 3));  // Append separator
+        }
+        sbBox10d.append(Root.TrimString(oVecClaimCodes.get(i)));
+    }
+}
+Step 7: Update Claim Codes in hcfa Table
+Query:
+
+sql
+Copy
+Edit
+UPDATE hcfa SET claimcodes = ? WHERE Id = ?;
+Flow:
+
+The final formatted claim codes (sbBox10d) are stored in the claimcodes field.
+NFS.FormatNSFString(sbBox10d.toString(), 19) ensures correct formatting.
+Code Snippet:
+
+java
+Copy
+Edit
+oPrStmt = oRoot.con.prepareStatement("UPDATE hcfa SET claimcodes = ? WHERE Id = ?");
+nParam = 0;
+oPrStmt.setString(++nParam, NFS.FormatNSFString(sbBox10d.toString(), 19));
+oPrStmt.setInt(++nParam, nHCFAPrintId);
+oPrStmt.executeUpdate();
+Step 8: Exception Handling & Cleanup
+If an exception occurs, it is logged.
+Database resources (ResultSet, PreparedStatement, and Connection) are closed.
+Code Snippet:
+
+java
+Copy
+Edit
+catch(Exception ex) {
+    EcwLog.AppendExceptionToLog(ex);
+}
+finally {
+    oRs = Root.EcwCloseResultSet(oRs);
+    oPrStmt = Root.EcwClosePreparedStatement(oPrStmt);
+    oRoot = Root.closeDbConnection(oRootCon, oRoot);
+}
+Complete Logical Flow Summary
+Step	Action	Query
+1	Initialize variables	-
+2	Fetch existing reserved10d from hcfa	SELECT reserved10d FROM hcfa WHERE id = ?;
+3	Check if new claim codes should be appended	SELECT keyvalue FROM hcfa0212_legacyprint WHERE keyname = 'hcfabox10d' AND deleteflag = 0;
+4	Fetch main claim condition code	SELECT conditioninformationcode FROM edi_inv_claimData WHERE InvId = ?;
+5	Fetch additional condition codes	SELECT conditioninformationcode FROM edi_inv_conditioncodes WHERE claimid = ? AND deleteflag = 0;
+6	Append up to 4 claim codes	-
+7	Update hcfa with claim codes	UPDATE hcfa SET claimcodes = ? WHERE Id = ?;
+8	Handle exceptions and close DB connections	-
+Final Thoughts
+This function ensures that claim codes are retrieved and updated correctly while handling legacy system rules.
+If keyvalue == 2, it removes old values before appending new ones.
+Only 4 claim codes are stored to prevent overflow.
+Proper exception handling and resource cleanup are included.
