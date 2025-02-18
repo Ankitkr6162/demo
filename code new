@@ -1,0 +1,121 @@
+private void populateNUCCClaimCodes(Root oRootCon , SuperBill oSuperBill , int nHCFAPrintId)
+	{
+		boolean bIsPrintNewInfo = false;
+		String str = null;
+		StringBuffer sbBox10d = null;
+		int nInvoiceId = 0;	  
+		int nParam = 0;
+		int nLegacyPrintKeyVal = 0;
+		Vector oVecClaimCodes = null;
+
+		Root oRoot = null;
+		PreparedStatement oPrStmt = null;		
+		ResultSet oRs = null;
+
+		try
+		{
+			oRoot = Root.createDbConnection(oRootCon);
+
+			//Invoice Id
+			nInvoiceId = oSuperBill.getInvoiceId();		
+
+			sbBox10d = new StringBuffer("");			
+			oPrStmt = oRoot.con.prepareStatement("SELECT reserved10d FROM hcfa WHERE id = ?");
+			nParam = 0;
+			oPrStmt.setInt(++nParam, nHCFAPrintId);
+			oRs = oPrStmt.executeQuery();
+			if(oRs.next()) {
+				sbBox10d.append(Root.TrimString(oRs.getString("reserved10d")));				
+			}
+			oRs = Root.EcwCloseResultSet(oRs);				
+			oPrStmt = Root.EcwClosePreparedStatement(oPrStmt);
+
+			//getting the value to print other additional information in hcfa 10d 
+			//(appended after the old value)
+			nLegacyPrintKeyVal = 0;
+			oPrStmt = oRoot.con.prepareStatement("SELECT keyvalue FROM hcfa0212_legacyprint WHERE keyname = 'hcfabox10d' AND deleteflag = 0");
+			oRs = oPrStmt.executeQuery();
+			if(oRs.next()) 
+			{
+				nLegacyPrintKeyVal = oRs.getInt("keyvalue");			 
+			}
+			oRs = Root.EcwCloseResultSet(oRs);
+			oPrStmt = Root.EcwClosePreparedStatement(oPrStmt);
+
+			bIsPrintNewInfo = false;
+			if(nLegacyPrintKeyVal == 0 || nLegacyPrintKeyVal == 2) {
+				bIsPrintNewInfo = true;
+			}
+
+			//New Box 10d values Only
+			if(nLegacyPrintKeyVal == 2) {
+				sbBox10d = new StringBuffer("");
+			}
+
+			oVecClaimCodes = new Vector();				
+			if(bIsPrintNewInfo)
+			{
+				oPrStmt = oRoot.con.prepareStatement("SELECT conditioninformationcode FROM edi_inv_claimData WHERE  InvId = ? ");							
+				nParam = 0 ;
+				oPrStmt.setInt(++nParam , nInvoiceId);
+				oRs = oPrStmt.executeQuery();
+
+				if(oRs.next())
+				{
+					str = Root.TrimString(oRs.getString("conditioninformationcode"));
+					if(str.length() > 0) {
+						oVecClaimCodes.add(str);
+					}
+				}
+				oRs = Root.EcwCloseResultSet(oRs);				
+				oPrStmt = Root.EcwClosePreparedStatement(oPrStmt);
+
+				//additional condition codes 
+				oPrStmt = oRoot.con.prepareStatement("SELECT conditioninformationcode FROM edi_inv_conditioncodes WHERE claimid = ? AND deleteflag = 0 ");
+				nParam = 0;
+				oPrStmt.setInt(++nParam , nInvoiceId);
+				oRs = oPrStmt.executeQuery();
+				while(oRs.next())
+				{
+					str = Root.TrimString(oRs.getString("conditioninformationcode"));
+					if(str.length() > 0) {
+						oVecClaimCodes.add(str);
+					}
+				}
+				oRs = Root.EcwCloseResultSet(oRs);
+				oPrStmt = Root.EcwClosePreparedStatement(oPrStmt);
+			}
+
+			if(oVecClaimCodes != null && oVecClaimCodes.size() > 0)
+			{					
+				for(int i=0;i < oVecClaimCodes.size() ; i++)
+				{
+					if(i >= 4) {
+						break;
+					}
+
+					if(sbBox10d != null && sbBox10d.length() > 0) {
+						sbBox10d.append(NFS.FormatNSFString("", 3));
+					}
+
+					sbBox10d .append(Root.TrimString((String)oVecClaimCodes.get(i)));
+				}					
+			}				
+
+			oPrStmt = oRoot.con.prepareStatement("UPDATE hcfa SET claimcodes = ? where Id = ?");	
+			nParam = 0;
+			oPrStmt.setString(++nParam , NFS.FormatNSFString(sbBox10d.toString() , 19));
+			oPrStmt.setInt(++nParam, nHCFAPrintId);
+			oPrStmt.executeUpdate();
+			oPrStmt = Root.EcwClosePreparedStatement(oPrStmt);
+		}
+		catch(Exception ex) {
+			EcwLog.AppendExceptionToLog(ex);
+		}
+		finally
+		{
+			oRs = Root.EcwCloseResultSet(oRs);
+			oPrStmt = Root.EcwClosePreparedStatement(oPrStmt);
+			oRoot = Root.closeDbConnection(oRootCon, oRoot);
+		} 
+	}
