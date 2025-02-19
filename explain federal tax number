@@ -1,0 +1,77 @@
+nUseTaxDefaults: Default value is 1, meaning tax defaults are used.
+nInsGroupId: Stores the insurance group ID.
+nUseDefaults: Determines if default values should be used.
+nRuleId: Stores the ID of the selected tax rule.
+sbRuleIds: Stores matched rule IDs.
+nProviderId: ID of the provider.
+nInsuranceId: ID of the insurance.
+strSvcDate: Service date (used for filtering).
+nFacSlNo: Facility serial number.
+
+
+Ensures Service date is not null or empty.
+if(strSvcDate != null  &&  !strSvcDate.trim().isEmpty()){
+    strSvcDate = DataValidation.sanitizeDateForLotNumberValidation(strSvcDate);
+}
+
+
+If Service date has exactly 10 characters, the process continues.
+Initializes sbRuleIds to store rule IDs.
+
+
+strSql = "SELECT prt.id, prt.TaxId,prt.TaxIdType, prt.SiteId, prt.BillingFacilityId FROM prtxids prt " + 
+         " LEFT OUTER JOIN prtxids_facilities fac ON (prt.Id = fac.PrTxRuleId AND fac.deleteFlag=0) " +
+         " LEFT OUTER JOIN prtxids_providers doc ON (prt.Id = doc.PrTxRuleId AND doc.deleteFlag=0) " +
+         " LEFT OUTER JOIN prtxids_insurances ins ON (prt.Id = ins.PrTxRuleId AND ins.deleteFlag=0) ";
+
+Queries the prtxids table to get:
+TaxId, TaxIdType, SiteId, BillingFacilityId
+
+Joins:
+prtxids_facilities, prtxids_providers, and prtxids_insurances to filter by provider, insurance, and facility.
+
+
+If a record is found:
+Assigns TaxId, TaxIdType, SiteId, BillingFacilityId.
+Sets m_bInitialized = true (data found).
+Stores the id in nRuleId.
+
+
+If multiple tax IDs match, logs a warning.
+
+If no tax ID is found in prtxids, tries:
+
+a) checks payerprfacoverrides → Stores tax ID overrides based on Provider, Facility, Insurance, and Payer ID.
+OR insurance → Stores PayerId
+
+b) then it checks "SELECT * FROM prinsnumbers WHERE ProviderId=" + nProviderId + " AND InsuranceId=" + nInsuranceId;
+             
+
+c) if no tax id found then checks SELECT * FROM insgroupprnumbers WHERE ProviderId=" + nProviderId + " AND InsGroupId=" + nInsGroupId;
+
+d) If all other cases fails  checks "SELECT taxid, taxidtype FROM doctors WHERE doctorID=" + nProviderId;
+
+
+
+
+===Summary=== 
+First, check prtxids → If a valid rule exists for the provider, insurance, and facility, use its tax ID.
+
+checks payerprfacoverrides → Stores tax ID overrides based on Provider, Facility, Insurance, and Payer ID.
+OR insurance → Stores PayerId
+
+If still not found, check provider-specific tax IDs → Queries prinsnumbers for tax IDs assigned directly to providers.
+
+If no provider-specific ID, check the insurance group level → If the insurance belongs to a group with a tax ID, use it.
+
+If all else fails, default to doctors table → Retrieves the provider's tax ID.
+
+Once found, tax ID is stored in m_strTaxId and marked as initialized (m_bInitialized = true).
+
+
+
+
+
+
+
+
