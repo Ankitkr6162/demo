@@ -203,3 +203,115 @@ This function ensures that claim codes are retrieved and updated correctly while
 If keyvalue == 2, it removes old values before appending new ones.
 Only 4 claim codes are stored to prevent overflow.
 Proper exception handling and resource cleanup are included.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+public static ResultSet GetPayerPrFacOverrideResultSet(Statement oStmt, int nProviderSlNo, int nInsuranceSlNo, String strSvcDate, int nFacilitySlNo) throws Exception {
+		if ((nInsuranceSlNo <= 0) || (nProviderSlNo <= 0) || (oStmt == null)) {
+			return null;
+		}
+
+		String strSql = "";
+		String strSqlPart1 = "";
+		String strSqlPart2 = "";
+
+		ResultSet oRs = null;
+		ResultSet oRsReturn = null;
+
+		// Reverting APPSEC-5507 Changes as oRoot.CloseConnection() in finally was closing returning ResultSet object in MSSQL,
+		// and at End of Final build of V11.50.11 release to minimise risk
+		// Keeping PE-89590 Changes as it does not affect Resultset Object
+		try
+		{
+		strSvcDate = DataValidation.sanitizeDateForLotNumberValidation(strSvcDate);
+		strSqlPart1 = "SELECT * FROM payerprfacoverrides " +
+		" WHERE deleteFlag=0  " +
+		"  AND ProviderSlNo=" + nProviderSlNo +
+		"  AND (ServFacilitySlNo=" + nFacilitySlNo + " OR ServFacilitySlNo=0) " +
+		"  AND ((SelectiveServiceDates=0)  " +
+		"             OR " +
+		"       ((EffDate IS NULL OR EffDate <= '" + (Root.TrimString(strSvcDate).length()==YYYY_MM_DD_FORMAT_LENGTH ? (strSvcDate+" 23:59:59") : strSvcDate) + "') " +
+		"                           AND " +
+		"        (EndServiceDate IS NULL OR EndServiceDate >= '" + (Root.TrimString(strSvcDate).length()==YYYY_MM_DD_FORMAT_LENGTH ? (strSvcDate+" 00:00:00") : strSvcDate) + "'))) ";
+
+		strSqlPart2 = " ORDER BY ServFacilitySlNo DESC LIMIT 1 ";
+
+
+			strSql = strSqlPart1 +
+			"  AND InsSlNo=" + nInsuranceSlNo + " AND RuleByInsId=1 " +
+			strSqlPart2;
+			oRs = oStmt.executeQuery(strSql);
+			if(oRs.next())
+			{
+				oRsReturn = oRs;
+				oRs = null; // To Prevent Closing of Rs
+			}
+			oRs = catalog.Root.EcwCloseResultSet(oRs);
+
+			if(oRsReturn == null)
+			{
+				String strPayerId = "";
+
+			strSql = "SELECT PayorId from insurance where insId=" + nInsuranceSlNo;
+			oRs = oStmt.executeQuery(strSql);
+				if(oRs.next())
+				{
+					strPayerId = oRs.getString("PayorId");
+				}
+				oRs = catalog.Root.EcwCloseResultSet(oRs);
+
+				strPayerId = catalog.Root.TrimString(strPayerId);
+
+				if(strPayerId.length() > 0)
+				{
+					strSql = strSqlPart1 +
+				" AND PayerId='" + strPayerId + "' AND RuleByInsId=0 " +
+				strSqlPart2;
+				oRs = oStmt.executeQuery(strSql);
+					if(oRs.next())
+					{
+						oRsReturn = oRs;
+						oRs = null;  // To Prevent Closing of ResultSet
+					}
+				oRs = catalog.Root.EcwCloseResultSet(oRs);
+				}
+			}
+		}
+		catch(Exception ex)
+		{
+			new catalog.Root().AppendExceptionToLog(ex);
+		}
+		return oRsReturn;
+	}
