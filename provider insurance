@@ -1,0 +1,264 @@
+public void InitProviderInsuranceTaxIds( catalog.Root oRootCon, int nProviderId, int nInsuranceId, String strSvcDate, int nFacSlNo, catalog.NSFCheck oNSFCheck ) throws Exception
+	{
+		int nUseTaxDefaults = 1;
+		int nInsGroupId = 0;
+		int nUseDefaults = 0;
+		int nRuleId = 0;
+		int nIndex = 0;
+		
+		String strSql = null;
+		StringBuffer sbRuleIds = null;
+		Statement oStmt = null;
+		ResultSet oRs = null;
+		Root oRoot = null;
+		PreparedStatement oPrStmt = null;
+
+		oRoot = catalog.Root.createDbConnection( oRootCon );
+		oStmt = oRoot.con.createStatement();
+
+		MigratePrTxIdsProvidersInsurances(oRoot);
+		if(strSvcDate != null  &&  !strSvcDate.trim().isEmpty()){
+			strSvcDate = DataValidation.sanitizeDateForLotNumberValidation(strSvcDate);
+		}
+
+		if ( strSvcDate != null && strSvcDate.length() == 10 )
+		{
+			nRuleId = 0;
+			sbRuleIds = new StringBuffer();
+			
+			// PE-40373 - Performance Re-Engineering for HCA :: Praburam
+			// PE-36831 - Additional performance-related changes
+			strSql = "SELECT prt.id, prt.TaxId,prt.TaxIdType, prt.SiteId, prt.BillingFacilityId FROM prtxids prt " + 
+					" LEFT OUTER JOIN prtxids_facilities fac ON (prt.Id = fac.PrTxRuleId AND fac.deleteFlag=0) " +
+					" LEFT OUTER JOIN prtxids_providers doc ON (prt.Id = doc.PrTxRuleId AND doc.deleteFlag=0) " +
+					" LEFT OUTER JOIN prtxids_insurances ins ON (prt.Id = ins.PrTxRuleId AND ins.deleteFlag=0) ";
+			if (com.ecw.dao.SqlTranslator.isMySql5080())
+			{
+				strSql += " WHERE (SELECT CASE WHEN prt.AllApptProviders=1 THEN 1" +
+				          " WHEN doc.ApptProviderId=? THEN 1 ELSE 0 END) = 1" +
+				          " AND (SELECT CASE WHEN prt.AllInsurances=1 THEN 1" +
+				          " WHEN ins.InsuranceId=? THEN 1 ELSE 0 END) = 1" +
+				          " AND (SELECT CASE WHEN prt.AllAppointmentFacilities=1 THEN 1" +
+				          " WHEN fac.FacilityId=? THEN 1 ELSE 0 END) = 1" +
+				          " AND (SELECT CASE WHEN prt.StartSvcDate <= ? AND prt.EndSvcDate >= ? THEN 1" +
+				          " WHEN prt.AllServiceDates=1 THEN 1 ELSE 0 END) = 1";
+			}
+			else
+			{
+				strSql += " WHERE (doc.ApptProviderId=? OR prt.AllApptProviders=1)" +
+				          " AND (ins.InsuranceId=? OR prt.AllInsurances=1)" +
+				          " AND (fac.FacilityId=? OR prt.AllAppointmentFacilities=1)" +
+				          " AND ((prt.StartSvcDate <=? AND prt.EndSvcDate >= ?) OR (prt.AllServiceDates = 1))";
+			}
+			strSql += " AND prt.deleteFlag=0" +
+			          " ORDER BY prt.AllApptProviders ASC, prt.AllInsurances ASC, prt.AllAppointmentFacilities ASC";
+			
+			oPrStmt = oRoot.con.prepareStatement( strSql );
+			nIndex=0;
+			oPrStmt.setInt(++nIndex, nProviderId);
+			oPrStmt.setInt(++nIndex, nInsuranceId);
+			oPrStmt.setInt(++nIndex, nFacSlNo);
+			oPrStmt.setString(++nIndex, strSvcDate);
+			oPrStmt.setString(++nIndex, strSvcDate);
+			oRs = oPrStmt.executeQuery();
+			while( oRs.next() )
+			{
+				if(nRuleId == 0) {
+					m_strTaxId = oRs.getString( "TaxId" );
+					m_strTaxIdType = oRs.getString( "TaxIdType" );
+					m_strSiteId = oRs.getString( "SiteId" );
+					m_nBillingFacilityId = oRs.getInt( "BillingFacilityId" );
+					m_bInitialized = true;
+
+					nRuleId = oRs.getInt("id"); // Using the data from First Rule only
+					sbRuleIds.append(nRuleId);
+				} else {
+
+					String strTempTaxId = catalog.Root.TrimString(oRs.getString("TaxId"));
+					String strTempTaxIdType = catalog.Root.TrimString(oRs.getString( "TaxIdType"));
+					String strTempSiteId = catalog.Root.TrimString(oRs.getString("SiteId"));
+					int nTempBillingFacilityId = oRs.getInt("BillingFacilityId");
+					int nTempRuleId = oRs.getInt("id");
+
+					if(!strTempTaxId.equalsIgnoreCase(m_strTaxId) || 
+							!strTempTaxIdType.equalsIgnoreCase(m_strTaxIdType) ||
+							!strTempSiteId.equalsIgnoreCase(m_strSiteId) ||
+							!(nTempBillingFacilityId == m_nBillingFacilityId) ) 
+					{
+						sbRuleIds.append("," + nTempRuleId);
+					}
+				}
+			}
+			oRs.close();
+			oPrStmt = Root.EcwClosePreparedStatement(oPrStmt);
+
+			if(sbRuleIds.indexOf(",") > 0) {
+				String strMsg = "Multiple 'TaxIDs by Service Date Rules' are matched:'" + sbRuleIds.toString() + "'. Using the data from Rule Id:" + nRuleId + 
+						". Please verify the Tax ID rules configuration.  Input data:ProviderId=" + nProviderId +
+						", InsuranceId=" + nInsuranceId + ", ServiceDt=" + strSvcDate + ", FacilityId=" + nFacSlNo;
+				
+				m_strDuplicateRulesMsg = strMsg;
+
+				if(null != oNSFCheck) {
+					oNSFCheck.AppendError(strMsg);
+				}
+			}
+		}
+
+		if ( !m_bInitialized )
+		{
+			if ( nFacSlNo > 0 && nInsuranceId > 0 && nProviderId > 0 )
+			{
+				oRs = uadmin.Insurance.GetPayerPrFacOverrideResultSet( oStmt, nProviderId, nInsuranceId, strSvcDate, nFacSlNo );
+				if ( oRs != null )
+				{
+					nUseTaxDefaults = oRs.getInt( "UseDefaults" );
+					if ( nUseTaxDefaults == 0 )
+					{
+						m_strTaxId = oRs.getString( "TaxId" );
+						m_strTaxIdType = oRs.getString( "TaxIdType" );
+						m_strSiteId = oRs.getString( "SiteId" );
+						m_nBillingFacilityId = oRs.getInt( "BillingFacilitySlNo" );
+						m_bInitialized = true;
+					}
+				}
+				oRs = EcwCloseResultSet( oRs );
+			}
+		}
+
+		if ( !m_bInitialized )
+		{
+			strSql = "SELECT * FROM prinsnumbers where ProviderId=" + nProviderId;
+			strSql += " AND InsuranceId=" + nInsuranceId;
+			oRs = oStmt.executeQuery( strSql );
+			if ( oRs.next() )
+			{
+				nUseDefaults = oRs.getInt( "UseDefaults" );
+				if ( nUseDefaults == 0 )
+				{
+					m_strTaxId = oRs.getString( "TaxId" );
+					m_strTaxIdType = oRs.getString( "TaxIdType" );
+					m_strSiteId = oRs.getString( "SiteId" );
+					m_nBillingFacilityId = oRs.getInt( "BillingFacilityId" );
+					m_bInitialized = true;
+				}
+			}
+			oRs.close();
+		}
+
+		// Check at the group level
+		if ( !m_bInitialized )
+		{
+			nInsGroupId = 0;
+			strSql = "select * from insgroupmembers where InsuranceId=" + nInsuranceId;
+			oRs = oStmt.executeQuery( strSql );
+			if ( oRs.next() )
+			{
+				nInsGroupId = oRs.getInt( "InsGroupId" );
+			}
+			oRs.close();
+
+			if ( nInsGroupId > 0 )
+			{
+				strSql = "SELECT * FROM insgroupprnumbers where ProviderId=" + nProviderId;
+				strSql += " AND InsGroupId=" + nInsGroupId;
+				oRs = oStmt.executeQuery( strSql );
+				if ( oRs.next() )
+				{
+					nUseDefaults = oRs.getInt( "UseDefaults" );
+					if ( nUseDefaults == 0 )
+					{
+						m_strTaxId = oRs.getString( "TaxId" );
+						m_strTaxIdType = oRs.getString( "TaxIdType" );
+						m_strSiteId = oRs.getString( "SiteId" );
+						m_nBillingFacilityId = oRs.getInt( "BillingFacilityId" );
+						m_bInitialized = true;
+					}
+				}
+				oRs.close();
+			}
+		}
+
+		if ( ! m_bInitialized )
+		{
+			// query reduction rewrite 
+			strSql = "SELECT taxid, taxidtype, taxidsuffix, facilityid FROM doctors WHERE doctorID=" + nProviderId;
+			oRs = oStmt.executeQuery( strSql );
+			if( oRs.next() )
+			{
+				m_strTaxId      =  oRs.getString( "taxid" );
+				m_strTaxIdType  = oRs.getString( "taxidtype" );
+				m_strSiteId     = oRs.getString( "taxidsuffix" );
+				m_nBillingFacilityId   = Integer.parseInt( oRs.getString( "facilityid" ) );
+        m_bNoOverrides = true;
+				m_bInitialized = true;
+			}
+			oRs.close();
+		}
+
+		oStmt.close();
+		oRoot = catalog.Root.closeDbConnection( oRootCon, oRoot );
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ public UB04Patient getPatient(UB04Patient patient) {
+        
+        getUserDetails(patient);
+        getPatientDetails(patient);
+        getInvoiceDiagnosisCode(patient);
+        getInvoiceCPT(patient);
+        getRevCPTDetails(patient);
+        getFacilityInfo(patient);
+        getUB92Info(patient);
+        patient.setDataYear(patient.getServiceDt().substring(0, 4));
+        getProviderDetails(patient);
+       
+        TaxIds oTaxIds = new TaxIds();
+        try {
+            oTaxIds.InitProviderInsuranceTaxIds(oRoot, patient.getPayToProviderId(), patient.getInsIdOfClaimPayer(), patient.getServiceDt(), (int) patient.getInvFacilityid());
+            String federalTaxNo = oTaxIds.getTaxId();
+            if (federalTaxNo != null && federalTaxNo.length() == 9 && federalTaxNo.charAt(2) != '-')
+                federalTaxNo = federalTaxNo.substring(0, 2) + "-" + federalTaxNo.substring(2);
+            if ("S".equals(oTaxIds.getTaxIdType()))
+               ; 
+            else if ("E".equals(oTaxIds.getTaxIdType()))
+                patient.setFederalTaxNumber(federalTaxNo);
+           
+        } catch (Exception ex) {
+            // TODO : add to the error
+            new catalog.Root().AppendExceptionToLog(ex);
+        }
+
+
+
+
+
+
+
+
+
+
+
+        Federal Tax Id of facility(on claim)
+ 
+        getInvoiceInsuranceDetails(patient);
+
+        return patient;
+    }
