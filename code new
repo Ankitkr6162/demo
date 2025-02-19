@@ -220,3 +220,19 @@ public static ResultSet GetPayerPrFacOverrideResultSet(Statement oStmt, int nPro
 		}
 		return oRsReturn;
 	}
+
+
+
+
+String strSql = "SELECT * FROM payerprfacoverrides " +
+    " WHERE deleteFlag=0  " +
+    "  AND ProviderSlNo=" + nProviderSlNo +
+    "  AND (ServFacilitySlNo=" + nFacilitySlNo + " OR ServFacilitySlNo=0) " +
+    "  AND ((SelectiveServiceDates=0)  " +
+    "             OR " +
+    "       ((EffDate IS NULL OR EffDate <= '" + (Root.TrimString(strSvcDate).length()==YYYY_MM_DD_FORMAT_LENGTH ? (strSvcDate+" 23:59:59") : strSvcDate) + "') " +
+    "                           AND " +
+    "        (EndServiceDate IS NULL OR EndServiceDate >= '" + (Root.TrimString(strSvcDate).length()==YYYY_MM_DD_FORMAT_LENGTH ? (strSvcDate+" 00:00:00") : strSvcDate) + "'))) " +
+    "  AND InsSlNo=" + nInsuranceSlNo + " AND RuleByInsId=1 " +
+    " ORDER BY ServFacilitySlNo DESC LIMIT 1";
+
