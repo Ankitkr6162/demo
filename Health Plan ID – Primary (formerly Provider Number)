@@ -1,0 +1,239 @@
+	public static Provider getProviderInsuranceNumbersAndTypesBySvcDateForFacility(catalog.Root oRootCon, int nProviderSlNo, int nInsuranceSlNo, String strSvcDate, int nFacilitySlNo) throws Exception
+	{
+		boolean bGotPrNumber = false;
+		boolean bUseTaxId = false;
+		String strSql = null;
+		String strPayerId = "";
+		Statement oStmt = null;
+		ResultSet oRs = null;
+		catalog.Root oRoot = null;
+		Provider lpProvider = new Provider();
+
+		String strProviderNumber = null;
+		String strProviderNumberType = null;
+		String strProviderGpNumber = null;
+		String strProviderGpNumberType = null;
+
+		oRoot = catalog.Root.createDbConnection(oRootCon);
+		oStmt = oRoot.con.createStatement();
+
+		bGotPrNumber = false;
+
+		if(nProviderSlNo > 0 && nInsuranceSlNo > 0 && nFacilitySlNo > 0)
+		{
+			oRs = GetPayerPrFacOverrideResultSet(oStmt, nProviderSlNo, nInsuranceSlNo,
+					strSvcDate, nFacilitySlNo);
+			if(oRs != null)
+			{
+				bGotPrNumber = true;
+				strProviderNumber = oRs.getString("ProviderNumber");
+				strProviderNumberType = oRs.getString("RefProvIdType");
+				strProviderGpNumber = oRs.getString("GroupNumber");
+				strProviderGpNumberType = oRs.getString("RefProvGrpIdType");
+			}
+			oRs = catalog.Root.EcwCloseResultSet(oRs);
+		}
+
+		if((strProviderNumber== null)||(strProviderNumber.length()<=0)||
+				(strProviderGpNumber == null)||(strProviderGpNumber.length()<=0))
+		{
+			lpProvider = getProviderInsuranceNumbersAndTypes(oRoot, nProviderSlNo, nInsuranceSlNo);
+			if((strProviderNumber== null)||(strProviderNumber.length()<=0))
+			{
+				strProviderNumber = lpProvider.getProviderPinNumber();
+				strProviderNumberType = lpProvider.getProviderPinNumberType();
+			}
+			if((strProviderGpNumber == null)||(strProviderGpNumber.length()<=0))
+			{
+				strProviderGpNumber = lpProvider.getProviderGpNumber();
+				strProviderGpNumberType = lpProvider.getProviderGpNumberType();
+			}
+		}
+
+		// Group Numbers Override by Service Date for Payer
+		if(strPayerId != null && strPayerId.length() > 0 && nProviderSlNo > 0 && nFacilitySlNo > 0)
+		{
+			strSql = "SELECT GroupNo, GroupNoType from OvrdGrpNums " +
+					" where deleteFlag=0 and PayerId='" + strPayerId + "' " +
+					"  AND StartDt <='" + strSvcDate + "' AND EndDt >='" + strSvcDate + "' " +
+					"  AND ServFacilitySlNo IN (0, " + nFacilitySlNo + ") " +
+					"  AND PrId IN (0, " + nProviderSlNo + ") " +
+					" ORDER BY ServFacilitySlNo DESC, PrId DESC ";
+			oRs = oStmt.executeQuery(strSql);
+			if(oRs.next())
+			{
+				String strTemp = oRoot.TrimString(oRs.getString("GroupNo"));
+				if(strTemp.length() > 0)
+				{
+					strProviderGpNumber = strTemp;
+					strProviderGpNumberType = oRoot.TrimString(oRs.getString("GroupNoType"));
+				}
+			}
+			oRs.close();
+		}
+
+		bUseTaxId = CanUseTaxId(oRoot);
+		strProviderNumber = catalog.Root.TrimString(strProviderNumber);
+		strProviderGpNumber = catalog.Root.TrimString(strProviderGpNumber);
+
+		if( (bUseTaxId) &&
+				( (strProviderNumber.length()<=0) || (strProviderGpNumber.length()<=0) ))
+		{
+			edi.TaxIds oTaxIds = new edi.TaxIds();
+			oTaxIds.InitProviderInsuranceTaxIds(oRoot, nProviderSlNo, nInsuranceSlNo, strSvcDate, nFacilitySlNo);
+
+			String strTaxIdL = catalog.Root.TrimString(oTaxIds.getTaxId());
+			String strTaxIdTypeL = catalog.Root.TrimString(oTaxIds.getTaxIdType());
+
+			if(strTaxIdTypeL.equalsIgnoreCase("E"))
+			{
+				strTaxIdTypeL = "EI";
+			}
+			else if(strTaxIdTypeL.equalsIgnoreCase("S"))
+			{
+				strTaxIdTypeL = "SY";
+			}
+
+			if(strProviderNumber.length() <= 0 && strTaxIdL.length() > 0)
+			{
+				strProviderNumber = strTaxIdL;
+				strProviderNumberType = strTaxIdTypeL;
+			}
+
+			if(strProviderGpNumber.length() <= 0 && strTaxIdL.length() > 0)
+			{
+				strProviderGpNumber = strTaxIdL;
+				strProviderGpNumberType = strTaxIdTypeL;
+			}
+		}
+
+		// PE-40373
+		// May/25/2018 - HCAPS Performance issue with too Many calls to TaxIds
+		// The following will reduce at minimum one call or avoid both calls altogether
+
+		/* strProviderNumber = uadmin.Insurance.MapProviderPinGrpNumbersWithTaxID(oRoot, nProviderSlNo, nInsuranceSlNo, strSvcDate, nFacilitySlNo, strProviderNumber);
+		strProviderNumber = catalog.Root.TrimString(strProviderNumber);
+
+		strProviderGpNumber = uadmin.Insurance.MapProviderPinGrpNumbersWithTaxID(oRoot, nProviderSlNo, nInsuranceSlNo, strSvcDate, nFacilitySlNo, strProviderGpNumber);
+		strProviderGpNumber = catalog.Root.TrimString(strProviderGpNumber); */
+
+		if( (strProviderNumber != null && strProviderNumber.length() > 0) ||
+				(strProviderGpNumber != null && strProviderGpNumber.length() > 0) )
+		{
+
+			try {
+				Vector vPrNumbers = new Vector();
+				vPrNumbers.add(strProviderNumber);
+				vPrNumbers.add(strProviderGpNumber);
+
+				vPrNumbers = MapProviderPinGrpNumbersWithTaxID(oRoot, nProviderSlNo, nInsuranceSlNo, strSvcDate, nFacilitySlNo, vPrNumbers);
+
+				if(vPrNumbers!=null && vPrNumbers.size() == 2) {
+
+					if(null != vPrNumbers.get(0)) {
+						strProviderNumber = Root.TrimString((String)vPrNumbers.get(0));		// As vector preserve the order, so 0 index we will get Provider number and in index 1 we will get Provider Group NUMBER
+					}
+
+					if(null != vPrNumbers.get(1)) {
+						strProviderGpNumber = Root.TrimString((String)vPrNumbers.get(1));
+					}
+				}
+			}
+			catch(Exception exTaxIdMapping) {
+				EcwLog.AppendExceptionToLog(exTaxIdMapping);
+			}
+		}
+
+
+		//Enterprise - To get the priority over the others
+		if ( EnterpriseDirtectory.IsEnterpriseDirectoryEnabled(oRoot) ) {
+			Map<String, String> providerData = getProviderNumberDetailsForED(oRoot, nProviderSlNo, nInsuranceSlNo, nFacilitySlNo);
+			if(providerData != null){
+				strProviderNumber = (String) providerData.get("ProviderNumber");
+				strProviderNumberType = (String) providerData.get("GroupNumber");
+				strProviderGpNumber = (String) providerData.get("ProviderNoType");
+				strProviderGpNumberType = (String) providerData.get("GroupNoType");
+			}
+		}
+		//Enterprise -End
+
+		lpProvider.setProviderPinNumber(NONULL(strProviderNumber));
+		lpProvider.setProviderPinNumberType(NONULL(strProviderNumberType));
+		lpProvider.setProviderGpNumber(NONULL(strProviderGpNumber));
+		lpProvider.setProviderGpNumberType(NONULL(strProviderGpNumberType));
+
+		oStmt.close();
+		oRoot = catalog.Root.closeDbConnection(oRootCon, oRoot);
+		return lpProvider;
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+public static String getProviderGroupNumberBySvcDateForFacility(catalog.Root oRootCon, int nProviderSlNo, int nInsuranceSlNo, String strSvcDate, int nFacilitySlNo) throws Exception
+	{
+		String strPrGrpNumber = null;
+		uadmin.Provider oProvider = null;
+
+		oProvider = getProviderInsuranceNumbersAndTypesBySvcDateForFacility(oRootCon,
+				nProviderSlNo, nInsuranceSlNo, strSvcDate, nFacilitySlNo);
+
+		strPrGrpNumber = oProvider.getProviderGpNumber();
+		strPrGrpNumber = catalog.Root.TrimString(strPrGrpNumber);
+
+		return strPrGrpNumber;
+
+		/*
+    boolean bGotPrNumber = false;
+    String strSql = null;
+    String strPrGrpNumber = null;
+    String strPayerId = null;
+    Statement oStmt = null;
+    ResultSet oRs = null;
+    catalog.Root oRoot = null;
+
+    oRoot = catalog.Root.createDbConnection(oRootCon);
+    oStmt = oRoot.con.createStatement();
+
+    bGotPrNumber = false;
+    strPrGrpNumber = "";
+    if(nProviderSlNo > 0 && nInsuranceSlNo > 0 && nFacilitySlNo > 0)
+    {
+      strPayerId = getPayerId(oRoot, nInsuranceSlNo);
+      if(strPayerId.length() > 0)
+      {
+        strSql = "SELECT GroupNumber FROM payerprfacoverrides where deleteFlag=0  " +
+          " AND ProviderSlNo=" + nProviderSlNo +
+          " AND (ServFacilitySlNo=" + nFacilitySlNo + " OR ServFacilitySlNo=0) " +
+          " AND PayerId='" + strPayerId + "' " +
+          " ORDER BY ServFacilitySlNo DESC LIMIT 1 ";
+        oRs = oStmt.executeQuery(strSql);
+        if(oRs.next())
+        {
+          bGotPrNumber = true;
+          strPrGrpNumber = oRs.getString("GroupNumber");
+        }
+        oRs.close();
+      }
+    }
+
+    if(!bGotPrNumber)
+      strPrGrpNumber = getProviderGroupNumberBySvcDate(oRoot, nProviderSlNo, nInsuranceSlNo, strSvcDate);
+
+    strPrGrpNumber = uadmin.Insurance.MapProviderPinGrpNumbersWithTaxID(oRoot, nProviderSlNo, nInsuranceSlNo, strSvcDate, nFacilitySlNo, strPrGrpNumber);
+    strPrGrpNumber = catalog.Root.TrimString(strPrGrpNumber);
+
+    oStmt.close();
+    oRoot = catalog.Root.closeDbConnection(oRootCon, oRoot);
+    return strPrGrpNumber;
+		 */
+	}
