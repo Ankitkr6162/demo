@@ -258,7 +258,9 @@ public void InitProviderInsuranceTaxIds( catalog.Root oRootCon, int nProviderId,
 
         Federal Tax Id of facility(on claim)
  
-        getInvoiceInsuranceDetails(patient);
-
-        return patient;
-    }
+       public String getTaxId()
+	{
+		String strTaxId = null;
+		strTaxId = NFS.FormatTaxId( m_strTaxId );
+		return strTaxId;
+	}
