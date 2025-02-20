@@ -1,0 +1,390 @@
+java local char is consuming 144mb seeing below data repeated multiple times
+
+id":null,"LastName":null,"FirstName":null,"DOB":null,"Zip":null,"Gender":null,"programs":[{"id":null,"name":"UDS","scorable":null,"total_measure_count":null,"met_measure_count":null,"measures":[{"fqn":"208","name":"Colorectal Cancer Screening","outcome":"NOT_ACHIEVED","value_unit":null,"due_date":null,"measure_due":null,"supporting_facts":[
+
+{"name":"Screening Not Done","date":null,"formatted_code":null,"formatted_source":null,"details":[]}
+],"frequency":null,"last_satisfied_date":null,"assmntIds":null,"ordersetEncId":null,"osSelectionType":null,"selectedTreatmentAsmtId":null,"adviceText":null,"inverse":null,"itemName":null,"complianceCode":null},{"fqn":"208","name":"Colorectal Cancer
+
+there is an array list loading 235 thousand entries of analytics.rcp.model.Measure
+
+which has below details
+
+ordersetencd -25912
+itemname-uds_depression_screening
+outcome-not_achived
+os selection type- order set
+fgn-220
+
+4. Expected output:
+
+Number of records and size allowed needs to be reviewed.
+
+Tomcat should not go out of memory
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+package analytics.rcp.uds.service;
+
+import CwMobile.CwUtils;
+import analytics.HedisRightChartPanel;
+import analytics.rcp.uds.dao.UdsCdeDao;
+import analytics.rcp.model.MainBody;
+import analytics.rcp.model.Measure;
+import analytics.rcp.model.Program;
+import analytics.rcp.model.SupportingFact;
+import analytics.rcp.uds.exception.UdsCdeException;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.time.LocalDate;
+import java.time.Year;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import static analytics.rcp.uds.constant.UdsCdeConstants.*;
+import static emr.healowplus.todolist.core.util.TodoContext.isTodoEnabled;
+
+public class UdsCdeService {
+
+    private final UdsCdeDao udsCdeDao;
+    private final HedisRightChartPanel hedisRightChartPanel;
+    private static final Logger LOGGER = LoggerFactory.getLogger(UdsCdeService.class);
+
+
+    public UdsCdeService() {
+        this.udsCdeDao = new UdsCdeDao();
+        this.hedisRightChartPanel = new HedisRightChartPanel();
+    }
+
+    /**
+     * Generates Uds data based on patientId and isGapsOnly
+     *
+     * @param patientId The patient id and isGapsOnly to get data for
+     * @return Returns a mainbody object
+     */
+    public String generateUds(boolean isGapsOnly, int patientId) {
+        MainBody mainBody = null;
+        String resp = null;
+        if (ENABLE_POPHEALTH_HEDIS_ITEMKEY.equalsIgnoreCase(CwUtils.getItemKeyValue(null, POPHEALTH_HEDIS_ITEMKEY))) {
+            resp = hedisRightChartPanel.generate(isGapsOnly, patientId);
+            Gson gson = new GsonBuilder().setPrettyPrinting().create();
+            mainBody = gson.fromJson(resp, MainBody.class);
+        } else {
+            mainBody = new MainBody();
+        }
+        try {
+            if (isTodoEnabled()) {
+                Optional<Program> udsProgram = Optional.ofNullable(setUdsPrograms(patientId));
+                Optional<List<Program>> mainPrograms = Optional.ofNullable(mainBody.getPrograms());
+                if (checkUDS() && mainPrograms.isPresent() && udsProgram.isPresent()) {
+                    if (isGapsOnly) {
+                        udsProgram.get().setMeasures(udsProgram.get().getMeasures().stream().filter(measure -> measure.getOutcome().equals(UDS_GAPS)).collect(Collectors.toList()));
+                        mainPrograms.get().add(udsProgram.get());
+                        mainBody.setPrograms(mainPrograms.get());
+                    } else {
+                        mainPrograms.get().add(udsProgram.get());
+                        mainBody.setPrograms(mainPrograms.get());
+                    }
+                }
+                udsMeasurePeriods(mainBody);
+            }
+        } catch (UdsCdeException e) {
+            LOGGER.error("Exception while getting UDS data", e.getMessage());
+        }
+        return new GsonBuilder().excludeFieldsWithoutExposeAnnotation().serializeNulls().create().toJson(mainBody);
+    }
+
+    /**
+     * Set Uds data for a given patientId
+     *
+     * @param patientId The patient id to get data for
+     * @return Returns object of udsProgram
+     */
+    private Program setUdsPrograms(int patientId) {
+        Program udsProgram = udsCdeDao.generateUDSProgram();
+        List<Measure> udsCollection = udsCdeDao.generateUDSMeasure(patientId).stream().map(measure -> {
+            String itemName = measure.getItemName();
+            if (itemName != null && !itemName.isEmpty()) {
+                measure.setOSSelectionType(COLUMN_NAME_ORDERSET);
+            }
+            return measure;
+        }).collect(Collectors.toList());
+        Optional<List<Measure>> udsMeasures = Optional.of(udsCollection);
+        Optional<Map<String, List<SupportingFact>>> udsMeasureSupportingFacts = Optional.ofNullable(udsCdeDao.generateUDSMeasureSupportingFacts(patientId));
+        if (udsMeasures.isPresent() && udsMeasureSupportingFacts.isPresent()) {
+            for (Measure measure : udsMeasures.get()) {
+                Optional<List<SupportingFact>> measureSupportingFacts = Optional.ofNullable(udsMeasureSupportingFacts.get().get(measure.getName()));
+                if (measureSupportingFacts.isPresent()) {
+                    measure.setSupportingFacts(measureSupportingFacts.get());
+                }
+            }
+            if (udsProgram != null) {
+                udsProgram.setMeasures(udsMeasures.get());
+            }
+        }
+        return udsProgram;
+    }
+
+    /**
+     * Checks for ebo_cde_job itemkey value and ebo_cde_master_program active status
+     *
+     * @return Returns ebo_cde_job itemkey value and ebo_cde_master_program active status
+     */
+    private boolean checkUDS() {
+        int active = udsCdeDao.getUdsActiveStatus();
+        return active == EBO_CDE_MASTER_PROGRAM_ACTIVE_VALUE && ENABLE_EBO_CDE_JOB_ITEMKEY.equalsIgnoreCase(CwUtils.getItemKeyValue(null, ITEM_KEY_EBO_CDE_JOB_ACTIVATION));
+    }
+
+    /**
+     * Set date & time format for udsMeasurePeriodStartDate and udsMeasurePeriodEndDate fields
+     */
+    private void udsMeasurePeriods(MainBody mainBody) {
+        mainBody.setUdsMeasurePeriodStartDate(LocalDate.of(Year.now().getValue(), 1, 1).format(DateTimeFormatter.ofPattern(DATE_TIME_FORMAT)));
+        mainBody.setUdsMeasurePeriodEndDate(LocalDate.of(Year.now().getValue(), 12, 31).format(DateTimeFormatter.ofPattern(DATE_TIME_FORMAT)));
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+package analytics.rcp.uds.dao;
+
+import analytics.HedisDao;
+import analytics.rcp.model.Measure;
+import analytics.rcp.model.Program;
+import analytics.rcp.model.SupportingFact;
+import analytics.rcp.uds.exception.UdsCdeException;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static analytics.rcp.uds.constant.UdsCdeConstants.*;
+import static analytics.rcp.uds.constant.UdsCdeQueryConstants.*;
+
+public class UdsCdeDao extends HedisDao {
+
+    /**
+     * Generates a list of Supporting Facts Objects for a given patientId
+     *
+     * @param patientId The patient id to get data for
+     * @return Returns a list of supporting Objects
+     */
+    public Map<String, List<SupportingFact>> generateUDSMeasureSupportingFacts(int patientId) {
+        Map<String, List<SupportingFact>> supportingFactsMap = new HashMap<>();
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            try (PreparedStatement preparedStatement = conn.prepareStatement(GET_UDS_SUPPORTING_FACTS_QUERY)) {
+                preparedStatement.setInt(1, patientId);
+                try (ResultSet rs = preparedStatement.executeQuery()) {
+                    while (rs.next()) {
+                        List<SupportingFact> supportingFacts = new ArrayList<>();
+                        SupportingFact supportingFact = new SupportingFact();
+                        String measureName = rs.getString(COLUMN_NAME_MEASURE);
+                        supportingFact.setName(rs.getString(COLUMN_NAME_SUPPORTING_FACTS));
+                        supportingFact.setDate(rs.getString(COLUMN_NAME_DATE));
+                        supportingFacts.add(supportingFact);
+                        supportingFactsMap.put(measureName, supportingFacts);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new UdsCdeException(e.getMessage());
+        } finally {
+            close(conn);
+        }
+        return supportingFactsMap;
+    }
+
+    /**
+     * Generates a list of Measure Objects for a given patientId
+     *
+     * @param patientId The patient id to get data for
+     * @return Returns a list of Measure Objects
+     */
+    public List<Measure> generateUDSMeasure(int patientId) {
+        List<Measure> measures = new ArrayList<>();
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            try (PreparedStatement pstmt = conn.prepareStatement(GET_UDS_MEASURES_QUERY)) {
+                pstmt.setInt(1, patientId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        Measure measure = new Measure();
+                        measure.setFqn(rs.getString(COLUMN_NAME_QID));
+                        measure.setName(rs.getString(COLUMN_NAME_MEASURE));
+                        measure.setOutcome(rs.getString(COLUMN_NAME_COMPLIANCE_STATUS));
+                        String itemName = rs.getString(COLUMN_NAME_ITEMNAME);
+                        measure.setItemName(itemName);
+                        measure.setOrdersetEncId(rs.getString(COLUMN_NAME_ORDERSETID));
+                        measures.add(measure);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new UdsCdeException(e.getMessage());
+        } finally {
+            close(conn);
+        }
+        return measures;
+    }
+
+    /**
+     * Generates a Program Object
+     *
+     * @return Returns a Program Object
+     */
+    public Program generateUDSProgram() {
+        Program program = null;
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            try (PreparedStatement pstmt = conn.prepareStatement(GET_UDS_PROGRAM_QUERY)) {
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        program = new Program();
+                        program.setName(rs.getString(COLUMN_NAME_PROGRAM));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new UdsCdeException(e.getMessage());
+        } finally {
+            close(conn);
+        }
+        return program;
+    }
+
+    /**
+     * Generates a integer active status value of ebo_cde_master_program table
+     *
+     * @return Returns integer active status value of ebo_cde_master_program table
+     */
+    public int getUdsActiveStatus() {
+        int active = -1;
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            try (PreparedStatement preparedStatement = conn.prepareStatement(GET_EBO_CDE_MASTER_ACTIVE_QUERY)) {
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    if (resultSet.next()) {
+                        active = resultSet.getInt(COLUMN_NAME_ACTIVE);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new UdsCdeException(e.getMessage());
+        } finally {
+            close(conn);
+        }
+        return active;
+    }
+}
+
