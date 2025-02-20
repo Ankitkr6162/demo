@@ -546,3 +546,75 @@ public class Program {
     total_measure_count = totalMeasureCount;
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+private Program setUdsPrograms(int patientId) {
+    Program udsProgram = udsCdeDao.generateUDSProgram();
+    List<Measure> udsCollection = udsCdeDao.generateUDSMeasure(patientId).stream().map(measure -> {
+        String itemName = measure.getItemName();
+        if (itemName != null && !itemName.isEmpty()) {
+            measure.setOSSelectionType(COLUMN_NAME_ORDERSET);
+        }
+        return measure;
+    }).collect(Collectors.toList());
+
+    Optional<List<Measure>> udsMeasures = Optional.of(udsCollection);
+    Optional<Map<String, List<SupportingFact>>> udsMeasureSupportingFacts = Optional.ofNullable(udsCdeDao.generateUDSMeasureSupportingFacts(patientId));
+
+    if (udsMeasures.isPresent() && udsMeasureSupportingFacts.isPresent()) {
+        for (Measure measure : udsMeasures.get()) {
+            Optional<List<SupportingFact>> measureSupportingFacts = Optional.ofNullable(udsMeasureSupportingFacts.get().get(measure.getName()));
+
+            if (measureSupportingFacts.isPresent()) {
+                List<SupportingFact> facts = measureSupportingFacts.get();
+
+                // ✅ Limit to 50 supporting facts per measure to reduce memory load
+                if (facts.size() > 50) {
+                    facts = facts.subList(0, 50);
+                }
+
+                measure.setSupportingFacts(facts);
+            }
+        }
+
+        // ✅ Prevent redundant measure addition by ensuring measures are set only once
+        if (udsProgram != null && udsProgram.getMeasures().isEmpty()) {
+            udsProgram.setMeasures(udsMeasures.get());
+        }
+    }
+
+    return udsProgram;
+}
+
