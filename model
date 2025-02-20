@@ -1,0 +1,548 @@
+package analytics.rcp.model;
+
+import com.google.gson.annotations.Expose;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Represents a Measures item
+ */
+public class Measure {
+
+  /**
+   * Vars
+   */
+  @Expose
+  private String fqn;
+  @Expose
+  private String name;
+  @Expose
+  private String outcome;
+  @Expose
+  private String value_unit;
+  @Expose
+  private String due_date;
+  @Expose
+  private Boolean measure_due;
+  @Expose
+  private List<SupportingFact> supporting_facts;
+  @Expose
+  private Integer frequency;
+  @Expose
+  private String last_satisfied_date;
+  @Expose
+  private String assmntIds;
+  @Expose
+  private String ordersetEncId;
+  @Expose
+  private String osSelectionType;
+  @Expose
+  private String selectedTreatmentAsmtId;
+  @Expose
+  private String adviceText;
+  @Expose
+  private Boolean inverse;
+  @Expose
+  private String itemName;
+
+  @Expose
+  private String complianceCode;
+
+  /**
+   * Empty Constructor
+   */
+  public Measure() {
+    this(null, null, null, null, null, null, null);
+  }
+
+  /**
+   * Constructor
+   *
+   * @param fqn        String
+   * @param name       String
+   * @param outcome    String
+   * @param valueUnit  String
+   * @param dueDate    String
+   * @param measureDue Boolean
+   * @param frequency  Integer
+   */
+  public Measure(
+      String fqn,
+      String name,
+      String outcome,
+      String valueUnit,
+      String dueDate,
+      Boolean measureDue,
+      Integer frequency) {
+    this.fqn = fqn;
+    this.name = name;
+    this.outcome = outcome;
+    value_unit = valueUnit;
+    due_date = dueDate;
+    measure_due = measureDue;
+    this.frequency = frequency;
+    last_satisfied_date = null;
+    supporting_facts = new ArrayList<>();
+    itemName = null;
+  }
+
+  /**
+   * Adds a SupportingFact to supporting_facts
+   *
+   * @param supportingFact The SupportingFact to add
+   */
+  public void addSupportingFact(SupportingFact supportingFact) {
+    supporting_facts.add(supportingFact);
+  }
+
+  /**
+   * Gets the advice text
+   *
+   * @return the advice text
+   */
+  public String getAdviceText() {
+    return adviceText;
+  }
+
+  /**
+   * Sets the advice text
+   *
+   * @param adviceText The advice text to set
+   */
+  public void setAdviceText(String adviceText) {
+    this.adviceText = adviceText;
+  }
+
+  /**
+   * Gets the assessment id
+   *
+   * @return the assessment id
+   */
+  public String getAssmntIds() {
+    return assmntIds;
+  }
+
+  /**
+   * Sets the assessment id
+   *
+   * @param assmntIds the assessment ids to set
+   */
+  public void setAssmntIds(String assmntIds) {
+    this.assmntIds = assmntIds;
+  }
+
+  /**
+   * @return the due_date
+   */
+  public String getDueDate() {
+    return due_date;
+  }
+
+  /**
+   * @param dueDate the due_date to set
+   */
+  public void setDueDate(String dueDate) {
+    due_date = dueDate;
+  }
+
+  /**
+   * @return the fqn
+   */
+  public String getFqn() {
+    return fqn;
+  }
+
+  /**
+   * @param fqn the fqn to set
+   */
+  public void setFqn(String fqn) {
+    this.fqn = fqn.trim();
+  }
+
+  /**
+   * @return the frequency
+   */
+  public Integer getFrequency() {
+    return frequency;
+  }
+
+  /**
+   * @param frequency the frequency to set
+   */
+  public void setFrequency(Integer frequency) {
+    this.frequency = frequency;
+  }
+
+  /**
+   * @return the last_satisfied_date
+   */
+  public String getLastSatisfiedDate() {
+    return last_satisfied_date;
+  }
+
+  /**
+   * @param lastSatisfiedDate the last_satisfied_date to set
+   */
+  public void setLastSatisfiedDate(String lastSatisfiedDate) {
+    last_satisfied_date = lastSatisfiedDate;
+  }
+
+  /**
+   * @return the measure_due
+   */
+  public Boolean getMeasureDue() {
+    return measure_due;
+  }
+
+  /**
+   * @param measureDue the measure_due to set
+   */
+  public void setMeasureDue(Boolean measureDue) {
+    measure_due = measureDue;
+  }
+
+  /**
+   * @return the name
+   */
+  public String getName() {
+    return name;
+  }
+
+  /**
+   * @param name the name to set
+   */
+  public void setName(String name) {
+    this.name = name.trim();
+  }
+
+  /**
+   * Gets the orderset encounter id
+   *
+   * @return the orderset encounter id
+   */
+  public String getOrdersetEncId() {
+    return ordersetEncId;
+  }
+
+  /**
+   * Sets the orderset encounter id
+   *
+   * @param ordersetEncId the orderset encounter id to set
+   */
+  public void setOrdersetEncId(String ordersetEncId) {
+    this.ordersetEncId = ordersetEncId;
+  }
+
+  /**
+   * Gets the ordersetName
+   * @return the String orderset name
+   */
+  public String getItemName() {
+    return itemName;
+  }
+
+  /**
+   * Sets the orderset name
+   * @param itemName the orderset name supplied
+   */
+  public void setItemName(String itemName) {
+    this.itemName = itemName;
+  }
+
+  /**
+   * Gets the orderset selection type
+   *
+   * @return the orderset selection type
+   */
+  public String getOSSelectionType() {
+    return osSelectionType;
+  }
+
+  /**
+   * Sets the orderset selection type
+   *
+   * @param osSelectionType the orderset selection type to set
+   */
+  public void setOSSelectionType(String osSelectionType) {
+    this.osSelectionType = osSelectionType;
+  }
+
+  /**
+   * @return the outcome
+   */
+  public String getOutcome() {
+    return outcome;
+  }
+
+  /**
+   * @param outcome the outcome to set
+   */
+  public void setOutcome(String outcome) {
+    this.outcome = outcome;
+  }
+
+  /**
+   * Returns the selected treatment assessment id
+   *
+   * @return the selected treatment assessment id
+   */
+  public String getSelectedTreatmentAsmtId() {
+    return selectedTreatmentAsmtId;
+  }
+
+  /**
+   * sets the selected treatment assessment id
+   *
+   * @param selectedTreatAsmtId the selected treatment assessment is to set
+   */
+  public void setSelectedTreatmentAsmtId(String selectedTreatAsmtId) {
+    selectedTreatmentAsmtId = selectedTreatAsmtId;
+  }
+
+  /**
+   * @return the supporting_facts
+   */
+  public List<SupportingFact> getSupportingFacts() {
+    return new ArrayList<>(supporting_facts);
+  }
+
+  /**
+   * @param supportingFacts the supporting_facts to set
+   */
+  public void setSupportingFacts(List<SupportingFact> supportingFacts) {
+    supporting_facts = new ArrayList<>(supportingFacts);
+  }
+
+  /**
+   * @return the value_unit
+   */
+  public String getValueUnit() {
+    return value_unit;
+  }
+
+  /**
+   * @param valueUnit the value_unit to set
+   */
+  public void setValueUnit(String valueUnit) {
+    value_unit = valueUnit;
+  }
+
+  public Boolean getInverse() {
+    return inverse;
+  }
+
+  public void setInverse(Boolean inverse) {
+    this.inverse = inverse;
+  }
+
+  public String getComplianceCode() {
+    return complianceCode;
+  }
+
+  public void setComplianceCode(String complianceCode) {
+    this.complianceCode = complianceCode;
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+package analytics.rcp.model;
+
+import com.google.gson.annotations.Expose;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Represents a programs item
+ */
+public class Program {
+
+  /**
+   * Vars
+   */
+  @Expose
+  private String id;
+  @Expose
+  private String name;
+  @Expose
+  private Boolean scorable;
+  @Expose
+  private Integer total_measure_count;
+  @Expose
+  private Integer met_measure_count;
+  @Expose
+  private List<Measure> measures;
+  @Expose
+  private List<SupportingFact> supporting_facts;
+
+  /**
+   * Empty Constructor
+   */
+  public Program() {
+    this(null, null, null, null, null);
+  }
+
+  /**
+   * Constructor
+   *
+   * @param id                String
+   * @param name              String
+   * @param scorable          Boolean
+   * @param totalMeasureCount Integer
+   * @param metMeasureCount   Integer
+   */
+  public Program(
+      String id,
+      String name,
+      Boolean scorable,
+      Integer totalMeasureCount,
+      Integer metMeasureCount) {
+    this.id = id;
+    this.name = name;
+    this.scorable = scorable;
+    total_measure_count = totalMeasureCount;
+    met_measure_count = metMeasureCount;
+    measures = new ArrayList<>();
+    supporting_facts = new ArrayList<>();
+  }
+
+  /**
+   * Adds a Measure to measures
+   *
+   * @param measure The Measure to add
+   */
+  public void addMeasure(Measure measure) {
+    measures.add(measure);
+    total_measure_count = measures.size();
+  }
+
+  /**
+   * Adds a SupportingFact to supporting_facts
+   *
+   * @param supportingFact The SupportingFact to add
+   */
+  public void addSupportingFact(SupportingFact supportingFact) {
+    supporting_facts.add(supportingFact);
+  }
+
+  /**
+   * @return the id
+   */
+  public String getId() {
+    return id;
+  }
+
+  /**
+   * @param id the id to set
+   */
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  /**
+   * @return the measures
+   */
+  public List<Measure> getMeasures() {
+    return new ArrayList<>(measures);
+  }
+
+  /**
+   * @param measures the measures to set
+   */
+  public void setMeasures(List<Measure> measures) {
+    this.measures = new ArrayList<>(measures);
+  }
+
+  /**
+   * @return the met_measure_count
+   */
+  public Integer getMetMeasureCount() {
+    return met_measure_count;
+  }
+
+  /**
+   * @param metMeasureCount the met_measure_count to set
+   */
+  public void setMetMeasureCount(Integer metMeasureCount) {
+    met_measure_count = metMeasureCount;
+  }
+
+  /**
+   * @return the name
+   */
+  public String getName() {
+    return name;
+  }
+
+  /**
+   * @param name the name to set
+   */
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  /**
+   * @return the scorable
+   */
+  public Boolean getScorable() {
+    return scorable;
+  }
+
+  /**
+   * @param scorable the scorable to set
+   */
+  public void setScorable(Boolean scorable) {
+    this.scorable = scorable;
+  }
+
+  /**
+   * @return the supporting_facts
+   */
+  public List<SupportingFact> getSupportingFacts() {
+    return new ArrayList<>(supporting_facts);
+  }
+
+  /**
+   * @param supportingFacts the supporting_facts to set
+   */
+  public void setSupportingFacts(List<SupportingFact> supportingFacts) {
+    supporting_facts = new ArrayList<>(supportingFacts);
+  }
+
+  /**
+   * @return the total_measure_count
+   */
+  public Integer getTotalMeasureCount() {
+    return total_measure_count;
+  }
+
+  /**
+   * @param totalMeasureCount the total_measure_count to set
+   */
+  public void setTotalMeasureCount(Integer totalMeasureCount) {
+    total_measure_count = totalMeasureCount;
+  }
+}
