@@ -1,0 +1,66 @@
+./gradlew setupTestDB -PdockerTestDb=true -PdbType=MSSQL -PdockerUserName=ankit.kumarsingh -PdockerPassword=BokaroThermal@829107 -PbranchName=develop
+
+
+
+
+
+
+
+
+
+
+
+
+
+> Task :mobiledoc:removeDbContainer
+task: removeTomcatConatiner started
+Removing docker container....
+[Execution worker for ':'] WARN com.github.dockerjava.core.DockerClientBuilder - 'dockerHttpClient' should be set.Falling back to Jersey, will be an error in future releases.
+Removing container with ID 'V11Emrdb-develop-MSSQL'.
+task: removeTomcatConatiner completed
+
+> Task :mobiledoc:modifyDbconfigFile
+Test medispan.wkconfig.xml Successfully Updated..
+
+> Task :mobiledoc:pullDBImage
+Docker Database Image :: ecwdevopsdocker.eclinicalworks.com/emr/trunk/dev/mssql-14:develop
+task: pullDBImage started
+[Execution worker for ':'] WARN com.github.dockerjava.core.DockerClientBuilder - 'dockerHttpClient' should be set.Falling back to Jersey, will be an error in future releases.
+Pulling repository 'ecwdevopsdocker.eclinicalworks.com/emr/trunk/dev/mssql-14'.
+
+[docker-java-stream-1388458612] ERROR com.github.dockerjava.api.async.ResultCallbackTemplate - Error during callback
+com.github.dockerjava.api.exception.InternalServerErrorException: Status 500: Get "https://ecwdevopsdocker.eclinicalworks.com/v2/": read tcp 172.27.102.255:43870->10.100.23.243:443: read: connection reset by peer
+        at com.github.dockerjava.jaxrs.filter.ResponseStatusExceptionFilter.filter(ResponseStatusExceptionFilter.java:68)
+        at org.glassfish.jersey.client.ClientFilteringStages$ResponseFilterStage.apply(ClientFilteringStages.java:171)
+        at org.glassfish.jersey.client.ClientFilteringStages$ResponseFilterStage.apply(ClientFilteringStages.java:159)
+        at org.glassfish.jersey.process.internal.Stages.process(Stages.java:147)
+        at org.glassfish.jersey.client.ClientRuntime.invoke(ClientRuntime.java:301)
+        at org.glassfish.jersey.client.JerseyInvocation.lambda$invoke$0(JerseyInvocation.java:609)
+        at org.glassfish.jersey.internal.Errors.process(Errors.java:292)
+        at org.glassfish.jersey.internal.Errors.process(Errors.java:274)
+        at org.glassfish.jersey.internal.Errors.process(Errors.java:205)
+        at org.glassfish.jersey.process.internal.RequestScope.runInScope(RequestScope.java:390)
+        at org.glassfish.jersey.client.JerseyInvocation.invoke(JerseyInvocation.java:608)
+        at com.github.dockerjava.jaxrs.JerseyDockerHttpClient.execute(JerseyDockerHttpClient.java:297)
+        at com.github.dockerjava.core.DefaultInvocationBuilder.execute(DefaultInvocationBuilder.java:228)
+        at com.github.dockerjava.core.DefaultInvocationBuilder.lambda$executeAndStream$1(DefaultInvocationBuilder.java:269)
+        at java.base/java.lang.Thread.run(Thread.java:829)
+
+> Task :mobiledoc:pullDBImage FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':mobiledoc:pullDBImage'.
+> Status 500: Get "https://ecwdevopsdocker.eclinicalworks.com/v2/": read tcp 172.27.102.255:43870->10.100.23.243:443: read: connection reset by peer
+
+* Try:
+Run with --stacktrace option to get the stack trace. Run with --info or --debug option to get more log output. Run with --scan to get full insights.
+
+* Get more help at https://help.gradle.org
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 7.0.
+Use '--warning-mode all' to show the individual deprecation warnings.
+See https://docs.gradle.org/6.7.1/userguide/command_line_interface.html#sec:command_line_warnings
+
+BUILD FAILED in 59s
