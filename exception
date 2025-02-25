@@ -1,0 +1,14 @@
+package analytics.rcp.uds.exception;
+
+public class UdsCdeException extends RuntimeException {
+
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * @return generates Uds exception message
+     */
+    public UdsCdeException(String message) {
+        super(message);
+    }
+}
+
