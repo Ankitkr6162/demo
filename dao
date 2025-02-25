@@ -1,0 +1,140 @@
+package analytics.rcp.uds.dao;
+
+import analytics.HedisDao;
+import analytics.rcp.model.Measure;
+import analytics.rcp.model.Program;
+import analytics.rcp.model.SupportingFact;
+import analytics.rcp.uds.exception.UdsCdeException;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static analytics.rcp.uds.constant.UdsCdeConstants.*;
+import static analytics.rcp.uds.constant.UdsCdeQueryConstants.*;
+
+public class UdsCdeDao extends HedisDao {
+
+    /**
+     * Generates a list of Supporting Facts Objects for a given patientId
+     *
+     * @param patientId The patient id to get data for
+     * @return Returns a list of supporting Objects
+     */
+    public Map<String, List<SupportingFact>> generateUDSMeasureSupportingFacts(int patientId) {
+        Map<String, List<SupportingFact>> supportingFactsMap = new HashMap<>();
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            try (PreparedStatement preparedStatement = conn.prepareStatement(GET_UDS_SUPPORTING_FACTS_QUERY)) {
+                preparedStatement.setInt(1, patientId);
+                try (ResultSet rs = preparedStatement.executeQuery()) {
+                    while (rs.next()) {
+                        List<SupportingFact> supportingFacts = new ArrayList<>();
+                        SupportingFact supportingFact = new SupportingFact();
+                        String measureName = rs.getString(COLUMN_NAME_MEASURE);
+                        supportingFact.setName(rs.getString(COLUMN_NAME_SUPPORTING_FACTS));
+                        supportingFact.setDate(rs.getString(COLUMN_NAME_DATE));
+                        supportingFacts.add(supportingFact);
+                        supportingFactsMap.put(measureName, supportingFacts);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new UdsCdeException(e.getMessage());
+        } finally {
+            close(conn);
+        }
+        return supportingFactsMap;
+    }
+
+    /**
+     * Generates a list of Measure Objects for a given patientId
+     *
+     * @param patientId The patient id to get data for
+     * @return Returns a list of Measure Objects
+     */
+    public List<Measure> generateUDSMeasure(int patientId) {
+        List<Measure> measures = new ArrayList<>();
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            try (PreparedStatement pstmt = conn.prepareStatement(GET_UDS_MEASURES_QUERY)) {
+                pstmt.setInt(1, patientId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        Measure measure = new Measure();
+                        measure.setFqn(rs.getString(COLUMN_NAME_QID));
+                        measure.setName(rs.getString(COLUMN_NAME_MEASURE));
+                        measure.setOutcome(rs.getString(COLUMN_NAME_COMPLIANCE_STATUS));
+                        String itemName = rs.getString(COLUMN_NAME_ITEMNAME);
+                        measure.setItemName(itemName);
+                        measure.setOrdersetEncId(rs.getString(COLUMN_NAME_ORDERSETID));
+                        measures.add(measure);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new UdsCdeException(e.getMessage());
+        } finally {
+            close(conn);
+        }
+        return measures;
+    }
+
+    /**
+     * Generates a Program Object
+     *
+     * @return Returns a Program Object
+     */
+    public Program generateUDSProgram() {
+        Program program = null;
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            try (PreparedStatement pstmt = conn.prepareStatement(GET_UDS_PROGRAM_QUERY)) {
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next()) {
+                        program = new Program();
+                        program.setName(rs.getString(COLUMN_NAME_PROGRAM));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new UdsCdeException(e.getMessage());
+        } finally {
+            close(conn);
+        }
+        return program;
+    }
+
+    /**
+     * Generates a integer active status value of ebo_cde_master_program table
+     *
+     * @return Returns integer active status value of ebo_cde_master_program table
+     */
+    public int getUdsActiveStatus() {
+        int active = -1;
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            try (PreparedStatement preparedStatement = conn.prepareStatement(GET_EBO_CDE_MASTER_ACTIVE_QUERY)) {
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    if (resultSet.next()) {
+                        active = resultSet.getInt(COLUMN_NAME_ACTIVE);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new UdsCdeException(e.getMessage());
+        } finally {
+            close(conn);
+        }
+        return active;
+    }
+}
+
