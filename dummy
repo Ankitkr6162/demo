@@ -25,3 +25,64 @@ public Map<String, List<SupportingFact>> generateUDSMeasureSupportingFacts(int p
     }
     return supportingFactsMap;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+public Map<String, List<SupportingFact>> generateUDSMeasureSupportingFacts(int patientId) {
+    Map<String, Set<SupportingFact>> supportingFactsMap = new HashMap<>(); // Use Set to prevent duplicates
+    Connection conn = null;
+    try {
+        conn = getConnection();
+        try (PreparedStatement preparedStatement = conn.prepareStatement(GET_UDS_SUPPORTING_FACTS_QUERY)) {
+            preparedStatement.setInt(1, patientId);
+            try (ResultSet rs = preparedStatement.executeQuery()) {
+                while (rs.next()) {
+                    String measureName = rs.getString(COLUMN_NAME_MEASURE);
+
+                    SupportingFact supportingFact = new SupportingFact();
+                    supportingFact.setName(rs.getString(COLUMN_NAME_SUPPORTING_FACTS));
+                    supportingFact.setDate(rs.getString(COLUMN_NAME_DATE));
+
+                    // Use HashSet to avoid duplicate SupportingFact entries
+                    supportingFactsMap.computeIfAbsent(measureName, k -> new HashSet<>()).add(supportingFact);
+                }
+            }
+        }
+    } catch (Exception e) {
+        throw new UdsCdeException(e.getMessage());
+    } finally {
+        close(conn);
+    }
+
+    // Convert Set back to List for final response
+    return supportingFactsMap.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> new ArrayList<>(e.getValue())));
+}
