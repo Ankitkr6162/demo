@@ -1,0 +1,27 @@
+public Map<String, List<SupportingFact>> generateUDSMeasureSupportingFacts(int patientId) {
+    Map<String, List<SupportingFact>> supportingFactsMap = new HashMap<>();
+    Connection conn = null;
+    try {
+        conn = getConnection();
+        try (PreparedStatement preparedStatement = conn.prepareStatement(GET_UDS_SUPPORTING_FACTS_QUERY)) {
+            preparedStatement.setInt(1, patientId);
+            try (ResultSet rs = preparedStatement.executeQuery()) {
+                while (rs.next()) {
+                    String measureName = rs.getString(COLUMN_NAME_MEASURE);
+
+                    SupportingFact supportingFact = new SupportingFact();
+                    supportingFact.setName(rs.getString(COLUMN_NAME_SUPPORTING_FACTS));
+                    supportingFact.setDate(rs.getString(COLUMN_NAME_DATE));
+
+                    // ✅ Append to existing list or create new one
+                    supportingFactsMap.computeIfAbsent(measureName, k -> new ArrayList<>()).add(supportingFact);
+                }
+            }
+        }
+    } catch (Exception e) {
+        throw new UdsCdeException(e.getMessage());
+    } finally {
+        close(conn);
+    }
+    return supportingFactsMap;
+}
